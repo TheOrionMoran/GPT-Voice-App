@@ -1,5 +1,7 @@
 import { ref } from 'vue';
 
+const API_URL = import.meta.env.VITE_API_URL || '';
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -22,7 +24,7 @@ export function useChat() {
     isLoading.value = true;
 
     try {
-      const response = await fetch('/api/chat', {
+      const response = await fetch(`${API_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: content })
