@@ -2,27 +2,31 @@
 import { ref, watch, nextTick } from 'vue'
 import { useSpeech } from '../composables/useSpeech'
 import IconMic from './icons/IconMic.vue'
-import IconSend from './icons/IconSend.vue'
+import IconArrow from './icons/IconArrow.vue'
 
 const props = defineProps<{ isLoading: boolean }>()
 const emit = defineEmits<{ (e: 'send', text: string): void }>()
 
 const text = ref('')
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
+const isOverflowing = ref(false)
 const { isListening, startListening, stopListening } = useSpeech()
 
 const adjustHeight = () => {
   const textarea = textareaRef.value
   if (!textarea) return
-  
   textarea.style.height = 'auto'
-  const maxHeight = parseInt(getComputedStyle(textarea).lineHeight) * 4 + 32
+  const style = getComputedStyle(textarea)
+  // Берем lineHeight, либо вычисляем его на основе fontSize (стандарт ~1.5 для relaxed)
+  const lineHeight = parseInt(style.lineHeight) || parseInt(style.fontSize) * 1.6
+  const paddingY = parseInt(style.paddingTop) + parseInt(style.paddingBottom)
+  // Добавляем небольшой запас (2px), чтобы избежать проблем с округлением в разных браузерах
+  const maxHeight = (lineHeight * 4) + paddingY + 2
   textarea.style.height = Math.min(textarea.scrollHeight, maxHeight) + 'px'
+  isOverflowing.value = textarea.scrollHeight > maxHeight
 }
 
-watch(text, () => {
-  nextTick(adjustHeight)
-})
+watch(text, () => nextTick(adjustHeight))
 
 const handleSend = () => {
   if (!text.value.trim() || props.isLoading) return
@@ -50,48 +54,33 @@ const handleMicClick = () => {
 </script>
 
 <template>
-  <div class="max-w-4xl mx-auto relative group">
-    <div
-      class="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-emerald-500 rounded-3xl blur opacity-20 transition duration-500"
-      :class="{'group-hover:opacity-40': !isLoading, 'opacity-10': isLoading}"
-    >
-    </div>
+  <div class="relative flex items-center rounded-2xl border-2 border-[#164084]">
+    <!-- Кнопка микрофона -->
+    <button type="button" @click="handleMicClick" :disabled="isLoading"
+      class="flex-shrink-0 ml-5 transition-all hover:cursor-pointer duration-200 disabled:opacity-40" :class="isListening
+        ? 'text-red-400 animate-pulse'
+        : 'text-[#2556a8] hover:text-white'" title="Голосовой ввод">
+      <IconMic class="w-6 h-6" />
+    </button>
 
-    <div class="relative flex items-end gap-2 bg-slate-800 p-2 rounded-3xl border border-slate-700 shadow-2xl">
-      <textarea 
-        ref="textareaRef"
-        v-model="text"
-        @keydown="handleKeydown"
-        :disabled="isLoading"
-        rows="1"
-        class="w-full bg-transparent text-slate-100 placeholder-slate-500 outline-none resize-none py-4 px-4 leading-relaxed disabled:opacity-50 custom-scrollbar"
-        placeholder="Введите сообщение..."
-      ></textarea>
+    <!-- Поле ввода -->
+    <textarea ref="textareaRef" v-model="text" @keydown="handleKeydown" :disabled="isLoading" rows="1"
+      class="flex-1 text-white placeholder-white/40 outline-none resize-none px-4 leading-relaxed disabled:opacity-50 custom-scrollbar text-[15px]"
+      :class="{ 'overflow-y-auto': isOverflowing, 'overflow-y-hidden': !isOverflowing }"
+      placeholder="Ask whatever you want"></textarea>
 
-      <button type="button"
-        @click="handleMicClick"
-        :disabled="isLoading"
-        class="p-4 rounded-full transition-all duration-300 flex-shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-        :class="isListening ? 'text-red-400 bg-red-400/20 animate-pulse' : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10'"
-        title="Голосовой ввод">
-        <IconMic class="w-6 h-6" />
-      </button>
-
-      <button type="button"
-        @click="handleSend"
-        :disabled="isLoading || !text.trim()"
-        class="p-4 text-white bg-blue-600 hover:bg-blue-500 rounded-full shadow-lg transition-all duration-300 flex-shrink-0 transform disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none cursor-pointer"
-        :class="{'hover:-translate-y-0.5 hover:shadow-blue-500/50': !isLoading && text.trim()}"
-        title="Отправить">
-        <IconSend class="w-6 h-6" />
-      </button>
-    </div>
+    <!-- Кнопка отправки -->
+    <button type="button" @click="handleSend" :disabled="isLoading || !text.trim()"
+      class="flex-shrink-0 w-12 h-12 rounded-xl bg-[#1d4c9a] hover:cursor-pointer group hover:bg-white flex items-center justify-center transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-500"
+      title="Отправить">
+      <IconArrow class="w-6 h-6 text-white group-hover:text-[#1d4c9a]" />
+    </button>
   </div>
 </template>
 
 <style scoped>
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -99,17 +88,12 @@ const handleMicClick = () => {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #334155; /* slate-700 */
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 10px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #475569; /* slate-600 */
-}
-
-/* Firefox */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #334155 transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 </style>
